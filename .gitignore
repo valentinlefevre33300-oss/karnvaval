@@ -27,3 +27,8 @@ dist/
 .env
 supabase/.env
 *.log
+node_modules/
+dist/
+.env
+supabase/.env
+*.log
