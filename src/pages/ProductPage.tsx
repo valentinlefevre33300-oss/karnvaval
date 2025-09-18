@@ -46,7 +46,15 @@ const ProductPage = () => {
         // Find product by matching slug
         const foundProduct = data?.find(p => getProductSlug(p.name) === slug);
         if (foundProduct) {
-          setProduct(foundProduct);
+          const normalized: Product = {
+            ...foundProduct,
+            sizes: Array.isArray(foundProduct.sizes)
+              ? foundProduct.sizes.map(String)
+              : typeof foundProduct.sizes === 'string'
+                ? foundProduct.sizes
+                : String(foundProduct.sizes ?? ''),
+          };
+          setProduct(normalized);
         }
       } catch (error) {
         console.error('Error fetching product:', error);
