@@ -1,35 +1,29 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/improved-dialog';
-import { Search, Package, AlertTriangle, CheckCircle, Edit, Plus } from 'lucide-react';
+import { Search, Package, AlertTriangle, CheckCircle, Plus } from 'lucide-react';
 import { Product } from '@/lib/types';
 import InstantDialog from './InstantDialog';
+import ProductEditDialog from './ProductEditDialog';
 
 const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Pre-load product data when setting editing product
-  const handleEditClick = useCallback((product: Product) => {
-    setEditingProduct(product);
-    setIsEditDialogOpen(true);
-  }, []);
+  const [editOpenId, setEditOpenId] = useState<string | null>(null);
 
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
+      console.time('[ProductManagement] fetchProducts');
       let query = supabase
         .from('products')
         .select('*')
@@ -47,9 +41,12 @@ const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean 
       console.error('Error fetching products:', error);
       setError('Erreur lors du chargement des produits');
     } finally {
+      console.timeEnd('[ProductManagement] fetchProducts');
       setLoading(false);
     }
   }, [searchQuery]);
+
+  const brandOptions = useMemo(() => Array.from(new Set(products.map(p => p.brand).filter(Boolean))), [products]);
 
   useEffect(() => {
     fetchProducts();
@@ -240,28 +237,7 @@ const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean 
                           </>
                         )}
                       </Badge>
-                      
                       <div className="flex gap-2">
-                        <InstantDialog
-                          isOpen={isEditDialogOpen}
-                          onOpenChange={setIsEditDialogOpen}
-                          trigger={
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => handleEditClick(product)}
-                              className="flex-shrink-0"
-                            >
-                              <Edit className="h-4 w-4" />
-                              <span className="hidden lg:inline ml-1">Modifier</span>
-                            </Button>
-                          }
-                          title="Modifier le produit"
-                          description="Modifiez les informations du produit ci-dessous."
-                          editingProduct={editingProduct}
-                          onComplete={handleEditComplete}
-                        />
-                        
                         <Button
                           size="sm"
                           variant={isOutOfStock(product.stock_quantity) ? "default" : "outline"}
@@ -275,6 +251,18 @@ const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean 
                             {isOutOfStock(product.stock_quantity) ? 'Stock' : 'Rupture'}
                           </span>
                         </Button>
+
+                        <ProductEditDialog
+                          trigger={<Button size="sm" variant="outline" className="flex-shrink-0" onClick={() => { console.log('[ProductManagement] Edit click', product.product_id); setEditOpenId(product.product_id); }}>Modifier</Button>}
+                          product={product}
+                          brandOptions={brandOptions}
+                          open={editOpenId === product.product_id}
+                          onOpenChange={(open) => { console.log('[ProductManagement] Dialog open change', product.product_id, open); setEditOpenId(open ? product.product_id : null); }}
+                          onUpdated={(updated) => {
+                            console.log('[ProductManagement] onUpdated', updated.product_id);
+                            setProducts(prev => prev.map(p => p.product_id === updated.product_id ? updated : p));
+                          }}
+                        />
                       </div>
                     </div>
                   </div>

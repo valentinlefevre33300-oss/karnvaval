@@ -18,16 +18,20 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 9%;
 
-    /* Primary - Trade Republic Green */
-    --primary: 142 76% 36%;
+    /* Brand Colors */
+    --brand-primary: 0 100% 80%; /* #FF9A9A */
+    --brand-primary-hover: 56 100% 50%; /* #FFF600 */
+
+    /* Primary */
+    --primary: var(--brand-primary);
     --primary-foreground: 0 0% 100%;
 
     /* Secondary - Light Gray */
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 9%;
 
-    /* Accent - Trade Republic Green */
-    --accent: 142 76% 36%;
+    /* Accent = primary */
+    --accent: var(--brand-primary);
     --accent-foreground: 0 0% 100%;
 
     /* Trade Republic Brand Colors */
@@ -47,7 +51,7 @@
 
     --border: 0 0% 90%;
     --input: 0 0% 96%;
-    --ring: 142 76% 36%;
+    --ring: var(--brand-primary);
 
     --radius: 8px;
 
@@ -58,7 +62,7 @@
     --shadow-floating: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 10px 10px -5px hsl(0 0% 0% / 0.04);
 
     /* Trade Republic Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--tr-green)), hsl(var(--tr-green-light)));
+    --gradient-primary: linear-gradient(135deg, hsl(var(--brand-primary)), hsl(var(--brand-primary-hover)));
     --gradient-dark: linear-gradient(135deg, hsl(var(--tr-black)), hsl(0 0% 15%));
     --gradient-light: linear-gradient(135deg, hsl(var(--background)), hsl(var(--tr-gray-light)));
 
@@ -143,6 +147,107 @@
 }
 
 @layer components {
+  /* Wave background for hero */
+  .wave-bg {
+    /* Pink wavy background, responsive and vector-based */
+    --wave-a: hsl(var(--brand-primary));            /* dark pink */
+    --wave-b: hsl(var(--brand-primary-hover));      /* contrast (yellow) for visibility tests */
+    --wave-light: hsl(var(--brand-primary) / 0.15);  /* base tint */
+    --wave-s: clamp(240px, 36vw, 560px);
+    --wave-h: calc(var(--wave-s) * 0.55);
+    background-color: var(--wave-light);
+    /* 4 staggered scallop layers → alternating colors */
+    background-image:
+      radial-gradient(100% 60% at 50% calc(100% + var(--wave-h) / 3), var(--wave-a) 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(0% - var(--wave-h) / 3), var(--wave-a) 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(100% + var(--wave-h) / 3), var(--wave-b) 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(0% - var(--wave-h) / 3), var(--wave-b) 24%, transparent 25%);
+    background-size:
+      var(--wave-s) var(--wave-h),
+      var(--wave-s) var(--wave-h),
+      var(--wave-s) var(--wave-h),
+      var(--wave-s) var(--wave-h);
+    background-position:
+      0 0,
+      calc(var(--wave-s) / 2) calc(var(--wave-h) / 2),
+      0 calc(var(--wave-h) / 2),
+      calc(var(--wave-s) / 2) 0;
+    background-repeat: repeat;
+  }
+
+  /* Demo variants for different implementation strategies */
+  .wave-demo-gradient {
+    --wave-a: hsl(var(--brand-primary));
+    --wave-b: hsl(var(--brand-primary-hover));
+    --wave-light: hsl(var(--brand-primary) / 0.12);
+    --wave-s: clamp(160px, 28vw, 420px);
+    --wave-h: calc(var(--wave-s) * 0.55);
+    background-color: var(--wave-light);
+    background-image:
+      radial-gradient(100% 60% at 50% calc(100% + var(--wave-h) / 3), var(--wave-a) 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(0% - var(--wave-h) / 3), var(--wave-a) 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(100% + var(--wave-h) / 3), var(--wave-b) 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(0% - var(--wave-h) / 3), var(--wave-b) 24%, transparent 25%);
+    background-size: var(--wave-s) var(--wave-h);
+    background-position:
+      0 0,
+      calc(var(--wave-s) / 2) calc(var(--wave-h) / 2),
+      0 calc(var(--wave-h) / 2),
+      calc(var(--wave-s) / 2) 0;
+    background-repeat: repeat;
+  }
+
+  .wave-demo-svg {
+    /* SVG data URI for crisp vector waves */
+    --c1: %23ff9a9a; /* approx brand-primary */
+    --c2: %23fff600; /* approx brand-primary-hover */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 110' preserveAspectRatio='none'><defs><path id='w' d='M0,55 C25,35 75,75 100,55 C125,35 175,75 200,55 V110 H0 Z'/></defs><g fill='%23ffe5e5'><rect width='200' height='110'/></g><use href='%23w' fill='var(--c1)'/><use href='%23w' y='-55' fill='var(--c2)'/><use href='%23w' y='55' fill='var(--c2)' opacity='0.7'/></svg>");
+    background-size: 260px 140px;
+    background-repeat: repeat;
+    background-color: hsl(var(--brand-primary) / 0.1);
+  }
+
+  .wave-demo-mask {
+    /* Two-color gradient masked by scallop pattern */
+    --wave-a: hsl(var(--brand-primary));
+    --wave-b: hsl(var(--brand-primary-hover));
+    --wave-s: clamp(160px, 28vw, 420px);
+    --wave-h: calc(var(--wave-s) * 0.55);
+    background:
+      linear-gradient(0deg, var(--wave-a) 0 50%, var(--wave-b) 50% 100%);
+    -webkit-mask:
+      radial-gradient(100% 60% at 50% calc(100% + var(--wave-h) / 3), #000 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(0% - var(--wave-h) / 3), #000 24%, transparent 25%);
+    -webkit-mask-size: var(--wave-s) var(--wave-h);
+    -webkit-mask-position: 0 0, calc(var(--wave-s) / 2) calc(var(--wave-h) / 2);
+    -webkit-mask-repeat: repeat;
+            mask:
+      radial-gradient(100% 60% at 50% calc(100% + var(--wave-h) / 3), #000 24%, transparent 25%),
+      radial-gradient(100% 60% at 50% calc(0% - var(--wave-h) / 3), #000 24%, transparent 25%);
+            mask-size: var(--wave-s) var(--wave-h);
+            mask-position: 0 0, calc(var(--wave-s) / 2) calc(var(--wave-h) / 2);
+            mask-repeat: repeat;
+  }
+
+  .starburst {
+    position: relative;
+    background: #FFF600;
+    color: #111;
+    clip-path: polygon(50% 0%, 60% 15%, 78% 7%, 82% 26%, 100% 25%, 90% 41%, 100% 50%, 90% 59%, 100% 75%, 82% 74%, 78% 93%, 60% 85%, 50% 100%, 40% 85%, 22% 93%, 18% 74%, 0% 75%, 10% 59%, 0% 50%, 10% 41%, 0% 25%, 18% 26%, 22% 7%, 40% 15%);
+  }
+
+  /* Slow, smooth rotation for badges */
+  .animate-spin-slow {
+    animation: spin 12s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-spin-slow { animation: none; }
+  }
   /* Trade Republic gradient backgrounds */
   .bg-gradient-primary {
     background: var(--gradient-primary);

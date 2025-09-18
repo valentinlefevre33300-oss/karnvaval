@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Product, parseProductSizes, getProductSlug } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
 import { OptimizedImage } from '@/components/OptimizedImage';
+import HomeCarousel from '@/components/HomeCarousel';
 const Index = () => {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,60 +59,10 @@ const Index = () => {
     value: "50+"
   }], []);
   return <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-background overflow-hidden">
-        <div className="container mx-auto px-4 py-16 sm:py-20 lg:py-32">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="space-y-4">
-                <h1 className="text-4xl lg:text-6xl font-bold leading-tight">
-                  La marketplace
-                  <span className="block text-primary">des sneakers</span>
-                </h1>
-                <p className="text-xl text-muted-foreground max-w-md">
-                  Découvrez, achetez et vendez les sneakers les plus exclusives de la planète.
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button asChild size="lg" className="text-lg px-8">
-                  <Link to="/catalogue">
-                    Explorer le catalogue
-                    <ArrowRight className="ml-2 h-5 w-5" />
-                  </Link>
-                </Button>
-                {!authUser && (
-                  <Button asChild variant="secondary" size="lg" className="text-lg px-8">
-                    <Link to="/auth/register">Créer un compte</Link>
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex gap-8 pt-8">
-                {stats.map((stat, index) => <div key={index} className="text-center">
-                    <div className="text-2xl font-bold text-primary">{stat.value}</div>
-                    <div className="text-sm text-muted-foreground">{stat.label}</div>
-                  </div>)}
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="aspect-square relative">
-                <img src="/src/assets/hero-sneakers.jpg" alt="Collection de sneakers" className="absolute inset-0 w-full h-full object-cover rounded-2xl shadow-2xl" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl" />
-              </div>
-              
-              {/* Floating elements */}
-              <div className="absolute -top-4 -right-4 bg-white/90 backdrop-blur-sm rounded-xl p-4 shadow-lg">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-sm font-medium">En ligne maintenant</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Hero Carousel */}
+      <div className="container mx-auto px-4 py-8 sm:py-10 lg:py-14">
+        <HomeCarousel />
+      </div>
 
       {/* Features Section */}
       <section className="py-20 bg-muted/50">

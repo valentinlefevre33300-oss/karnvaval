@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Facebook, Instagram, Twitter, Mail } from "lucide-react";
 export const Footer = () => {
   return <footer className="bg-brand-dark text-white bg-slate-100">
       <div className="container mx-auto px-4 py-12">
@@ -14,12 +13,7 @@ export const Footer = () => {
               Votre destination premium pour des sneakers reconditionnées de qualité. 
               Style, durabilité et performance réunis.
             </p>
-            <div className="flex space-x-4 bg-slate-100 mx-[10px]">
-              <Facebook className="h-5 w-5 text-gray-400 hover:text-brand-orange transition-colors cursor-pointer" />
-              <Instagram className="h-5 w-5 text-gray-400 hover:text-brand-orange transition-colors cursor-pointer bg-slate-50" />
-              <Twitter className="h-5 w-5 text-gray-400 hover:text-brand-orange transition-colors cursor-pointer" />
-              <Mail className="h-5 w-5 text-gray-400 hover:text-brand-orange transition-colors cursor-pointer" />
-            </div>
+            {/* Icônes réseaux sociaux retirées */}
           </div>
 
           {/* Navigation */}

@@ -72,7 +72,9 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
 
   // Update form data when editingProduct changes (for switching between products)
   React.useEffect(() => {
+    console.time('[InstantProductForm] init values');
     setFormData(initialFormData);
+    console.timeEnd('[InstantProductForm] init values');
   }, [initialFormData]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -88,6 +90,7 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
     setMessage('');
 
     try {
+      console.time('[InstantProductForm] submit->update');
       if (editingProduct) {
         const sizesArray = formData.sizes.split(',').map(s => s.trim()).filter(s => s);
         
@@ -125,6 +128,7 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
       setMessage('Erreur lors de la modification du produit');
       toast.error('Erreur lors de la modification du produit');
     } finally {
+      console.timeEnd('[InstantProductForm] submit->update');
       setLoading(false);
     }
   }, [editingProduct, formData, onEditComplete]);

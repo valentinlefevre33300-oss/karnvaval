@@ -100,6 +100,13 @@ const ProductPage = () => {
     return a.localeCompare(b);
   });
   const colors = parseProductColors(product.colors_general);
+  const normalizedColors = Array.from(new Set(
+    colors
+      .map((c) => (c ? String(c).trim() : ''))
+      .filter(Boolean)
+      .map((c) => c.toLowerCase())
+  ))
+    .map((lc) => lc.charAt(0).toUpperCase() + lc.slice(1));
   const isInStock = parseInt(product.stock_quantity) > 0;
   const handleAddToCart = () => {
     if (!product) return;
@@ -194,6 +201,22 @@ const ProductPage = () => {
               </Badge>
             </div>
 
+            {/* Colors (tags, non-clickable) */}
+            {normalizedColors.length > 0 && (
+              <div className="space-y-3">
+                <label className="text-sm font-semibold text-foreground">
+                  Couleurs
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {normalizedColors.map((color) => (
+                    <Badge key={color} variant="secondary" className="capitalize">
+                      {color}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Size Selection */}
             {availableSizes.length > 0 && <div className="space-y-3">
                 <label className="text-sm font-semibold text-foreground">
@@ -205,41 +228,6 @@ const ProductPage = () => {
                     </Button>)}
                 </div>
               </div>}
-
-            {/* Colors */}
-            {(() => {
-              const allColors = [...colors];
-              if (product.colors_general?.toLowerCase().includes('noir') && !allColors.some(c => c.toLowerCase() === 'noir')) {
-                allColors.push('Noir');
-              }
-              if (product.colors_general?.toLowerCase().includes('blanc') && !allColors.some(c => c.toLowerCase() === 'blanc')) {
-                allColors.push('Blanc');
-              }
-              const uniqueColors = Array.from(new Set(allColors.map(c => c.toLowerCase()))).map(c => 
-                allColors.find(color => color.toLowerCase() === c) || c
-              );
-              
-              return uniqueColors.length > 0 && (
-                <div className="space-y-3">
-                  <label className="text-sm font-semibold text-foreground">
-                    Couleur
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {uniqueColors.map(color => (
-                      <Button 
-                        key={color} 
-                        variant={selectedColor === color ? 'default' : 'outline'} 
-                        onClick={() => setSelectedColor(color)} 
-                        className={`px-4 py-2 rounded-lg transition-all capitalize ${selectedColor === color ? 'bg-primary text-primary-foreground shadow-md scale-105' : 'hover:scale-105 hover:border-primary'}`} 
-                        disabled={!isInStock}
-                      >
-                        {color}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* Action Buttons */}
             <div className="space-y-3">

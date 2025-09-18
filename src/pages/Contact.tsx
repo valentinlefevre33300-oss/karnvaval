@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { MapPin, Phone, Mail, Clock, MessageSquare, HelpCircle, Instagram } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, MessageSquare, HelpCircle } from "lucide-react";
 import ContactMap from "@/components/ContactMap";
 const Contact = () => {
   const contactInfo = [{
@@ -14,10 +14,6 @@ const Contact = () => {
     icon: Mail,
     title: "Email",
     content: "hello@karnaval.com"
-  }, {
-    icon: Instagram,
-    title: "Instagram",
-    content: "@karnaval_sneakers"
   }, {
     icon: Clock,
     title: "Temps de réponse",
