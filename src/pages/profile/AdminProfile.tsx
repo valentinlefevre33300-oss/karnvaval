@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Shield, User, Mail, Phone, Users, Store, ShoppingCart, TrendingUp, Upload, Package } from 'lucide-react';
+import { Shield, User, Mail, Phone, Users, Store, ShoppingCart, TrendingUp, Upload, Package, DollarSign, Calculator, Archive } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import OrdersList from '@/components/OrdersList';
 import ProductManagement from '@/components/ProductManagement';
 import ProductForm from '@/components/ProductForm';
 import { PromoCodeManagement } from '@/components/PromoCodeManagement';
+import { UserManagement } from '@/components/UserManagement';
 import ErrorBoundary from '@/components/ErrorBoundary';
 interface Stats {
   totalUsers: number;
@@ -25,6 +26,9 @@ interface Stats {
   totalOrders: number;
   totalRevenue: number;
   totalProducts: number;
+  stockValue: number;
+  averagePrice: number;
+  totalStock: number;
 }
 export const AdminProfile = () => {
   const {
@@ -62,7 +66,10 @@ export const AdminProfile = () => {
     totalVendors: 0,
     totalOrders: 0,
     totalRevenue: 0,
-    totalProducts: 0
+    totalProducts: 0,
+    stockValue: 0,
+    averagePrice: 0,
+    totalStock: 0
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -83,16 +90,45 @@ export const AdminProfile = () => {
       const totalOrders = orders?.length || 0;
       const totalRevenue = orders?.reduce((sum, order) => sum + (parseFloat(order.total.toString()) || 0), 0) || 0;
 
-      // Compter les produits réels
+      // Compter les produits réels et calculer la valeur des stocks
       const {
         data: products
-      } = await supabase.from('products').select('product_id');
+      } = await supabase.from('products').select('product_id, price, stock_quantity');
+      
+      // Calculer la valeur totale des stocks, prix moyen et stock total
+      let stockValue = 0;
+      let totalPriceSum = 0;
+      let totalStock = 0;
+      let validProductsCount = 0;
+
+      products?.forEach(product => {
+        const price = parseFloat(product.price) || 0;
+        const quantity = parseInt(product.stock_quantity) || 0;
+        
+        // Valeur des stocks
+        stockValue += price * quantity;
+        
+        // Stock total (nombre total de chaussures)
+        totalStock += quantity;
+        
+        // Prix moyen (seulement pour les produits avec un prix valide)
+        if (price > 0) {
+          totalPriceSum += price;
+          validProductsCount++;
+        }
+      });
+
+      const averagePrice = validProductsCount > 0 ? totalPriceSum / validProductsCount : 0;
+      
       setStats({
         totalUsers,
         totalVendors,
         totalOrders,
         totalRevenue,
-        totalProducts: products?.length || 0
+        totalProducts: products?.length || 0,
+        stockValue,
+        averagePrice,
+        totalStock
       });
     } catch (error) {
       console.error('Erreur lors du chargement des statistiques:', error);
@@ -156,54 +192,95 @@ export const AdminProfile = () => {
               <SelectTrigger className="w-full mb-4">
                 <SelectValue placeholder="Sélectionner une section" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="overview">Vue d'ensemble</SelectItem>
-                <SelectItem value="orders">Commandes</SelectItem>
-                <SelectItem value="products">Produits</SelectItem>
-              </SelectContent>
-            </Select> : <TabsList className="grid w-full grid-cols-3">
+                <SelectContent>
+                  <SelectItem value="overview">Vue d'ensemble</SelectItem>
+                  <SelectItem value="orders">Commandes</SelectItem>
+                  <SelectItem value="products">Produits</SelectItem>
+                  <SelectItem value="users">Utilisateurs</SelectItem>
+                </SelectContent>
+            </Select> : <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
               <TabsTrigger value="orders">Commandes</TabsTrigger>
               <TabsTrigger value="products">Produits</TabsTrigger>
+              <TabsTrigger value="users">Utilisateurs</TabsTrigger>
             </TabsList>}
 
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Commandes totales</CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 xs:gap-4 sm:gap-4 md:gap-6">
+              <Card className="min-w-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs xs:text-sm sm:text-sm font-medium truncate pr-1">Commandes totales</CardTitle>
+                  <ShoppingCart className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalOrders}</div>
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="pt-2 xs:pt-3 sm:pt-3">
+                  <div className="text-lg xs:text-xl sm:text-xl md:text-2xl font-bold">{stats.totalOrders}</div>
+                  <p className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
                     Total des commandes passées
                   </p>
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Revenus</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <Card className="min-w-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs xs:text-sm sm:text-sm font-medium truncate pr-1">Revenus</CardTitle>
+                  <TrendingUp className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">€{stats.totalRevenue.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="pt-2 xs:pt-3 sm:pt-3">
+                  <div className="text-lg xs:text-xl sm:text-xl md:text-2xl font-bold">€{stats.totalRevenue.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
                     Chiffre d'affaires total
                   </p>
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Produits</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
+              <Card className="min-w-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs xs:text-sm sm:text-sm font-medium truncate pr-1">Produits</CardTitle>
+                  <Package className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalProducts}</div>
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="pt-2 xs:pt-3 sm:pt-3">
+                  <div className="text-lg xs:text-xl sm:text-xl md:text-2xl font-bold">{stats.totalProducts}</div>
+                  <p className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
                     Produits en catalogue
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="min-w-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs xs:text-sm sm:text-sm font-medium truncate pr-1">Valeur des stocks</CardTitle>
+                  <DollarSign className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                </CardHeader>
+                <CardContent className="pt-2 xs:pt-3 sm:pt-3">
+                  <div className="text-lg xs:text-xl sm:text-xl md:text-2xl font-bold">€{stats.stockValue.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
+                    Valeur totale de l'inventaire
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="min-w-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs xs:text-sm sm:text-sm font-medium truncate pr-1">Prix moyen</CardTitle>
+                  <Calculator className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                </CardHeader>
+                <CardContent className="pt-2 xs:pt-3 sm:pt-3">
+                  <div className="text-lg xs:text-xl sm:text-xl md:text-2xl font-bold">€{stats.averagePrice.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
+                    Prix moyen des chaussures
+                  </p>
+                </CardContent>
+              </Card>
+              
+              <Card className="min-w-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
+                  <CardTitle className="text-xs xs:text-sm sm:text-sm font-medium truncate pr-1">Stock total</CardTitle>
+                  <Archive className="h-3 w-3 xs:h-4 xs:w-4 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                </CardHeader>
+                <CardContent className="pt-2 xs:pt-3 sm:pt-3">
+                  <div className="text-lg xs:text-xl sm:text-xl md:text-2xl font-bold">{stats.totalStock.toLocaleString('fr-FR')}</div>
+                  <p className="text-xs text-muted-foreground line-clamp-1 sm:line-clamp-2">
+                    Paires de chaussures en stock
                   </p>
                 </CardContent>
               </Card>
@@ -250,6 +327,12 @@ export const AdminProfile = () => {
 
                 
               </div>
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-6">
+            <ErrorBoundary>
+              <UserManagement />
+            </ErrorBoundary>
           </TabsContent>
 
         </Tabs>

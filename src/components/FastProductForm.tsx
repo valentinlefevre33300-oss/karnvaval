@@ -69,7 +69,7 @@ const FastProductForm: React.FC<FastProductFormProps> = ({
     }
   }, [editingProduct, parseSizes]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
@@ -181,13 +181,19 @@ const FastProductForm: React.FC<FastProductFormProps> = ({
 
         <div className="space-y-2">
           <Label htmlFor="category">Catégorie</Label>
-          <Input
+          <select
             id="category"
             name="category"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             value={formData.category}
             onChange={handleChange}
-            placeholder="Ex: Chaussures"
-          />
+          >
+            <option value="">Sélectionner…</option>
+            <option value="Homme">Homme</option>
+            <option value="Femme">Femme</option>
+            <option value="Unisexe">Unisexe</option>
+            <option value="Enfant">Enfant</option>
+          </select>
         </div>
 
         <div className="space-y-2">

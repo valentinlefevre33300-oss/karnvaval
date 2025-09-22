@@ -1,0 +1,19 @@
+<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- K Letter - Left vertical bar -->
+  <rect x="5" y="8" width="12" height="44" fill="#F8A5A5"/>
+  
+  <!-- K Letter - Top diagonal -->
+  <polygon points="17,8 45,8 30,30 17,30" fill="#F8A5A5"/>
+  
+  <!-- K Letter - Bottom diagonal -->
+  <polygon points="17,30 30,30 45,52 17,52" fill="#F8A5A5"/>
+  
+  <!-- First Dot -->
+  <circle cx="80" cy="30" r="8" fill="#F8A5A5"/>
+  
+  <!-- Second Dot -->
+  <circle cx="110" cy="30" r="8" fill="#F8A5A5"/>
+  
+  <!-- Third Dot -->
+  <circle cx="140" cy="30" r="8" fill="#F8A5A5"/>
+</svg>

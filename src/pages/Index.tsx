@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Star, TrendingUp, Shield, Users, ArrowRight } from 'lucide-react';
+import { TrendingUp, Shield, Users, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Product, parseProductSizes, getProductSlug } from '@/lib/types';
 import { useAuth } from '@/hooks/useAuth';
@@ -63,6 +63,54 @@ const Index = () => {
       <div className="container mx-auto px-4 py-8 sm:py-10 lg:py-14">
         <HomeCarousel />
       </div>
+
+      {/* About Banner */}
+      <section className="py-16 bg-gradient-to-br from-background via-primary/5 to-secondary/10">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            {/* Header */}
+            <div className="mb-12">
+              <div className="inline-flex items-center px-4 py-2 bg-primary/10 rounded-full text-primary font-medium mb-4">
+                <span className="mr-2">👟</span>
+                À propos de Karnaval
+              </div>
+              <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
+                La <span className="text-primary">révolution</span> des sneakers
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Fondée par <strong className="text-primary">Philippine Pujol</strong>, Karnaval transforme l'industrie de la mode en donnant une seconde vie aux sneakers jetées.
+              </p>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+              <div className="bg-background/80 backdrop-blur-sm p-6 rounded-2xl border border-primary/20 shadow-lg">
+                <div className="text-3xl font-bold text-primary mb-2">12 000+</div>
+                <div className="text-sm text-muted-foreground">Paires sauvées</div>
+              </div>
+              <div className="bg-background/80 backdrop-blur-sm p-6 rounded-2xl border border-primary/20 shadow-lg">
+                <div className="text-3xl font-bold text-primary mb-2">140T</div>
+                <div className="text-sm text-muted-foreground">CO₂ évitées</div>
+              </div>
+              <div className="bg-background/80 backdrop-blur-sm p-6 rounded-2xl border border-primary/20 shadow-lg">
+                <div className="text-3xl font-bold text-primary mb-2">18€</div>
+                <div className="text-sm text-muted-foreground">Économie moyenne</div>
+              </div>
+            </div>
+
+            {/* Mission Statement */}
+            <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-8 rounded-2xl border border-primary/20">
+              <div className="flex items-center justify-center mb-4">
+                <span className="text-2xl mr-3">🎯</span>
+                <h3 className="text-xl font-bold text-foreground">Notre mission</h3>
+              </div>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                Reconditionner, upcycler et remettre sur le marché des sneakers authentiques pour un style éco-responsable et accessible à tous.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Features Section */}
       <section className="py-20 bg-muted/50">
@@ -136,14 +184,6 @@ const Index = () => {
                         <h3 className="font-semibold text-lg line-clamp-2">
                           {product.name}
                         </h3>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => <Star key={i} className={`h-4 w-4 ${i < 4 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />)}
-                          </div>
-                          <span className="text-sm text-muted-foreground">
-                            (23 avis)
-                          </span>
-                        </div>
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <span className="text-2xl font-bold text-primary">

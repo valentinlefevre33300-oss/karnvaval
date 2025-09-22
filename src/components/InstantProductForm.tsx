@@ -67,6 +67,7 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
   }, [editingProduct]);
 
   const [formData, setFormData] = useState(initialFormData);
+  const [perSizeStock, setPerSizeStock] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -75,14 +76,39 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
     console.time('[InstantProductForm] init values');
     setFormData(initialFormData);
     console.timeEnd('[InstantProductForm] init values');
+    setPerSizeStock({});
   }, [initialFormData]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }));
   }, []);
+
+  // Derived sizes from category
+  const normalizedCategory = React.useMemo(() => (formData.category || '').toLowerCase(), [formData.category]);
+  const generatedSizes = React.useMemo(() => {
+    const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => String(a + i));
+    if (normalizedCategory === 'enfant') return range(16, 37);
+    if (normalizedCategory === 'femme') return range(35, 42);
+    if (normalizedCategory === 'homme') return range(38, 47);
+    if (normalizedCategory === 'unisexe') return range(35, 47);
+    return [];
+  }, [normalizedCategory]);
+
+  React.useEffect(() => {
+    if (generatedSizes.length === 0) return;
+    console.log('[InstantProductForm] generatedSizes', generatedSizes);
+    setPerSizeStock(prev => {
+      const next = { ...prev };
+      generatedSizes.forEach(sz => { if (!(sz in next)) next[sz] = 0; });
+      Object.keys(next).forEach(k => { if (!generatedSizes.includes(k)) delete next[k]; });
+      console.log('[InstantProductForm] perSizeStock:ensureAllSizes', next);
+      return next;
+    });
+    setFormData(prev => ({ ...prev, sizes: generatedSizes.join(', ') }));
+  }, [generatedSizes]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,16 +128,22 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
           category: formData.category,
           colors_general: formData.colors_general,
           image_url: formData.image_url,
-          stock_quantity: formData.stock_quantity || '0',
-          sizes: sizesArray.length > 0 ? JSON.stringify(sizesArray) : null
+          stock_quantity: String(Object.values(perSizeStock).reduce((a, b) => a + (Number(b) || 0), 0)),
+          sizes: sizesArray.length > 0 ? JSON.stringify(sizesArray) : null,
+          // @ts-expect-error JSONB column
+          stock_by_size: perSizeStock
         };
+        console.log('[InstantProductForm] submit:update payload', productData);
 
         const { error } = await supabase
           .from('products')
           .update(productData)
           .eq('product_id', editingProduct.product_id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('[InstantProductForm] submit:update error', error);
+          throw error;
+        }
 
         setMessage('Produit modifié avec succès !');
         toast.success('Produit modifié avec succès !');
@@ -121,7 +153,55 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
           ...editingProduct,
           ...productData
         };
+        console.log('[InstantProductForm] submit:update success', updatedProduct);
         onEditComplete?.(updatedProduct);
+      } else {
+        // Add mode
+        const sizesArray = formData.sizes.split(',').map(s => s.trim()).filter(s => s);
+        const newProductId = 'PROD-' + Date.now() + '-' + Math.random().toString(36).slice(2, 9);
+        const productData = {
+          name: formData.name,
+          brand: formData.brand,
+          description: formData.description,
+          price: formData.price || '0',
+          category: formData.category,
+          colors_general: formData.colors_general,
+          image_url: formData.image_url,
+          stock_quantity: String(Object.values(perSizeStock).reduce((a, b) => a + (Number(b) || 0), 0)),
+          sizes: sizesArray.length > 0 ? JSON.stringify(sizesArray) : null,
+          product_id: newProductId,
+          // @ts-expect-error JSONB column
+          stock_by_size: perSizeStock
+        };
+        console.log('[InstantProductForm] submit:insert payload', productData);
+
+        const { error } = await supabase
+          .from('products')
+          .insert([productData]);
+
+        if (error) {
+          console.error('[InstantProductForm] submit:insert error', error);
+          throw error;
+        }
+
+        setMessage('Produit ajouté avec succès !');
+        toast.success('Produit ajouté avec succès !');
+
+        onEditComplete?.(productData as unknown as Product);
+
+        // Reset form
+        setFormData({
+          name: '',
+          brand: '',
+          description: '',
+          price: '',
+          category: '',
+          colors_general: '',
+          image_url: '',
+          stock_quantity: '',
+          sizes: ''
+        });
+        setPerSizeStock({});
       }
     } catch (error) {
       console.error('Error updating product:', error);
@@ -174,7 +254,7 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 items-start">
         <div className="space-y-2">
           <Label htmlFor="price">Prix (€) *</Label>
           <Input
@@ -191,29 +271,34 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
 
         <div className="space-y-2">
           <Label htmlFor="category">Catégorie</Label>
-          <Input
+          <select
             id="category"
             name="category"
+            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
             value={formData.category}
             onChange={handleChange}
-            placeholder="Ex: Chaussures"
-          />
+          >
+            <option value="">Sélectionner…</option>
+            <option value="Homme">Homme</option>
+            <option value="Femme">Femme</option>
+            <option value="Unisexe">Unisexe</option>
+            <option value="Enfant">Enfant</option>
+          </select>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="stock_quantity">Stock</Label>
+          <Label htmlFor="stock_quantity">Stock total (auto)</Label>
           <Input
             id="stock_quantity"
             name="stock_quantity"
             type="number"
-            value={formData.stock_quantity}
-            onChange={handleChange}
-            placeholder="10"
+            value={Object.values(perSizeStock).reduce((a, b) => a + (Number(b) || 0), 0)}
+            readOnly
           />
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 items-start">
         <div className="space-y-2">
           <Label htmlFor="colors_general">Couleurs</Label>
           <Input
@@ -226,14 +311,26 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="sizes">Tailles (séparées par des virgules)</Label>
-          <Input
-            id="sizes"
-            name="sizes"
-            value={formData.sizes}
-            onChange={handleChange}
-            placeholder="Ex: 38, 39, 40, 41, 42"
-          />
+          <Label>Stock par taille</Label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+            {generatedSizes.map((sz) => (
+              <div key={sz} className="flex items-center gap-2">
+                <span className="w-10 text-sm text-muted-foreground">{sz}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={999}
+                  value={perSizeStock[sz] ?? 0}
+                  onChange={(e) => {
+                    const val = Math.max(0, Math.min(999, Number(e.target.value) || 0));
+                    console.log('[InstantProductForm] change stock', { size: sz, val });
+                    setPerSizeStock(prev => ({ ...prev, [sz]: val }));
+                  }}
+                  className="h-9 w-20 rounded-md border border-input bg-background px-2 text-sm"
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -250,10 +347,10 @@ const InstantProductForm: React.FC<InstantProductFormProps> = ({
 
       <Button type="submit" disabled={loading} className="w-full">
         <Save className="h-4 w-4 mr-2" />
-        {loading ? 'Modification...' : 'Modifier le produit'}
+        {loading ? (editingProduct ? 'Modification...' : 'Ajout en cours...') : (editingProduct ? 'Modifier le produit' : 'Ajouter le produit')}
       </Button>
     </form>
-  ), [formData, handleChange, handleSubmit, loading]);
+  ), [formData, handleChange, handleSubmit, loading, generatedSizes, perSizeStock]);
 
   return (
     <div className="bg-white dark:bg-gray-900 p-4 rounded-lg">

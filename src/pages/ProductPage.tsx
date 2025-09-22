@@ -9,10 +9,12 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Heart, Share2, Shield, Truck, RotateCcw, ArrowLeft, Check } from 'lucide-react';
-import { Product, parseProductSizes, parseProductColors, getProductSlug } from '@/lib/types';
+import { Product, parseProductSizes, parseProductColors, getProductSlug, parseStockBySize } from '@/lib/types';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useCart } from '@/hooks/useCart';
 import { toast } from '@/hooks/use-toast';
+import { Product3DViewer } from '@/components/3d/SketchfabViewer';
+import { formatWithParagraphs } from '@/lib/text-utils';
 const ProductPage = () => {
   const {
     slug
@@ -20,6 +22,7 @@ const ProductPage = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [stockBySize, setStockBySize] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<string>('description');
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [isPressed, setIsPressed] = useState(false);
@@ -55,6 +58,9 @@ const ProductPage = () => {
                 : String(foundProduct.sizes ?? ''),
           };
           setProduct(normalized);
+          // parse per-size stock if present
+          // @ts-expect-error DB may return any for JSONB
+          setStockBySize(parseStockBySize(foundProduct.stock_by_size));
         }
       } catch (error) {
         console.error('Error fetching product:', error);
@@ -161,14 +167,13 @@ const ProductPage = () => {
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Image Section */}
+        {/* Image/3D Section */}
         <div className="space-y-4">
-          <div className="aspect-square bg-muted rounded-lg overflow-hidden">
-            <img src={product.image_url || '/placeholder.svg'} alt={product.name} className="w-full h-full object-cover" onError={e => {
-            const target = e.target as HTMLImageElement;
-            target.src = '/placeholder.svg';
-          }} />
-          </div>
+          <Product3DViewer
+            modelId={product.model_3d_id}
+            productName={product.name}
+            imageUrl={product.image_url}
+          />
         </div>
 
         {/* Product Info */}
@@ -198,14 +203,16 @@ const ProductPage = () => {
                   Prix barré: prix neuf
                 </span>
               </div>
-              {!isInStock && <Badge variant="destructive">Stock épuisé</Badge>}
             </div>
             
-            {/* Stock Information */}
+            {/* Stock Information: per selected size or total (number only) */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Stock disponible:</span>
-              <Badge variant={isInStock ? "secondary" : "destructive"}>
-                {product.stock_quantity} {parseInt(product.stock_quantity) > 1 ? 'unités' : 'unité'}
+              <Badge variant={(() => {
+                const qty = selectedSize ? stockBySize[selectedSize] ?? 0 : parseInt(product.stock_quantity);
+                return qty > 0 ? 'secondary' : 'destructive';
+              })() as any}>
+                {selectedSize ? (stockBySize[selectedSize] ?? 0) : parseInt(product.stock_quantity)}
               </Badge>
             </div>
 
@@ -225,15 +232,34 @@ const ProductPage = () => {
               </div>
             )}
 
-            {/* Size Selection */}
+            {/* Size Selection (clean pills, no brackets/quotes) */}
             {availableSizes.length > 0 && <div className="space-y-3">
                 <label className="text-sm font-semibold text-foreground">
                   Taille
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {availableSizes.map(size => <Button key={size} variant={selectedSize === size ? 'default' : 'outline'} onClick={() => setSelectedSize(size)} className={`px-4 py-2 rounded-lg transition-all ${selectedSize === size ? 'bg-primary text-primary-foreground shadow-md scale-105' : 'hover:scale-105 hover:border-primary'}`} disabled={!isInStock}>
-                      {size}
-                    </Button>)}
+                  {availableSizes.map(size => {
+                    const label = String(size).replace(/["'\[\]]/g, '').trim();
+                    const qty = stockBySize[size];
+                    const disabled = qty !== undefined ? qty <= 0 : !isInStock;
+                    return (
+                      <button
+                        key={label}
+                        onClick={() => setSelectedSize(String(size))}
+                        className={`px-3 py-1.5 rounded-full border text-sm transition
+                          ${disabled
+                            ? 'bg-muted text-muted-foreground border-muted opacity-70 saturate-0 cursor-not-allowed'
+                            : selectedSize === size
+                              ? 'bg-primary text-primary-foreground border-primary cursor-pointer'
+                              : 'bg-background text-foreground hover:border-primary cursor-pointer'}`}
+                        disabled={disabled}
+                        aria-label={`Taille ${label}${qty !== undefined ? `, stock ${qty}` : ''}`}
+                        title={disabled ? 'Rupture' : `Stock: ${qty ?? 'n/a'}`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>}
 
@@ -242,7 +268,7 @@ const ProductPage = () => {
               <Button 
                 className={`w-full transition-transform duration-150 ${isPressed ? 'scale-95' : 'scale-100'}`} 
                 size="lg" 
-                disabled={!isInStock || availableSizes.length > 0 && !selectedSize} 
+                disabled={!isInStock || (availableSizes.length > 0 && !selectedSize) || (selectedSize && (stockBySize[selectedSize] ?? 0) <= 0)} 
                 onClick={handleAddToCart}
               >
                 {!isInStock ? 'Stock épuisé' : 'Ajouter au panier'}
@@ -303,8 +329,8 @@ const ProductPage = () => {
           <TabsContent value="description" className="mt-6">
             <Card>
               <CardContent className="p-6">
-                <p className="text-muted-foreground leading-relaxed">
-                  {product.description}
+                <p className="text-foreground text-base leading-7 whitespace-pre-line">
+                  {formatWithParagraphs(product.description || '')}
                 </p>
               </CardContent>
             </Card>

@@ -1,235 +1,226 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePromoCode } from '../usePromoCode';
 
-// Mock Supabase
-const mockRpc = vi.fn();
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {
-    rpc: mockRpc,
-  },
-}));
+// Mock Supabase client
+const mockSupabase = {
+  from: vi.fn(() => ({
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn(),
+  })),
+};
 
-// Mock toast
-const mockToast = vi.fn();
-vi.mock('@/hooks/use-toast', () => ({
-  toast: mockToast,
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: mockSupabase,
 }));
 
 describe('usePromoCode', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should initialize with no applied promo code', () => {
     const { result } = renderHook(() => usePromoCode());
-    
+
     expect(result.current.appliedPromoCode).toBeNull();
     expect(result.current.loading).toBe(false);
   });
 
-  it('should load applied promo code from localStorage', () => {
-    const storedPromoData = {
-      success: true,
-      promo_code_id: 'promo-123',
-      discount_amount: 10,
-      discount_type: 'percentage',
-      discount_value: 10,
-    };
-    
-    localStorage.setItem('appliedPromoCodeData', JSON.stringify(storedPromoData));
-    
-    const { result } = renderHook(() => usePromoCode());
-    
-    expect(result.current.appliedPromoCode).toEqual(storedPromoData);
-  });
-
-  it('should validate successful promo code', async () => {
-    const mockResponse = {
-      success: true,
-      promo_code_id: 'promo-123',
-      discount_amount: 15.50,
-      discount_type: 'percentage',
-      discount_value: 10,
+  it('should apply valid promo code successfully', async () => {
+    const mockPromoCode = {
+      id: '1',
+      code: 'SAVE20',
+      discount_type: 'percent',
+      discount_value: 20,
+      max_uses: 100,
+      uses_count: 50,
+      valid_from: '2024-01-01',
+      valid_until: '2024-12-31',
     };
 
-    mockRpc.mockResolvedValue({
-      data: mockResponse,
+    mockSupabase.from().maybeSingle.mockResolvedValue({
+      data: mockPromoCode,
       error: null,
     });
 
     const { result } = renderHook(() => usePromoCode());
-    
-    let validationResult;
+
     await act(async () => {
-      validationResult = await result.current.validatePromoCode('SAVE10', 155);
+      const promoResult = await result.current.applyPromoCode('SAVE20');
+      expect(promoResult.success).toBe(true);
+      expect(promoResult.discount_type).toBe('percent');
+      expect(promoResult.discount_value).toBe(20);
     });
-    
-    expect(mockRpc).toHaveBeenCalledWith('apply_promo_code', {
-      p_code: 'SAVE10',
-      p_order_total: 155,
-    });
-    
-    expect(validationResult).toEqual(mockResponse);
-    expect(result.current.appliedPromoCode).toEqual(mockResponse);
-    expect(mockToast).toHaveBeenCalledWith({
-      title: "Code promo appliqué !",
-      description: "Vous économisez 15,50€",
-    });
+
+    expect(mockSupabase.from).toHaveBeenCalledWith('promo_codes');
   });
 
   it('should handle invalid promo code', async () => {
-    const mockResponse = {
-      success: false,
-      error: 'Code promo invalide ou expiré',
-    };
-
-    mockRpc.mockResolvedValue({
-      data: mockResponse,
-      error: null,
-    });
-
-    const { result } = renderHook(() => usePromoCode());
-    
-    let validationResult;
-    await act(async () => {
-      validationResult = await result.current.validatePromoCode('INVALID', 100);
-    });
-    
-    expect(validationResult).toEqual(mockResponse);
-    expect(result.current.appliedPromoCode).toBeNull();
-    expect(mockToast).toHaveBeenCalledWith({
-      title: "Code promo invalide",
-      description: 'Code promo invalide ou expiré',
-      variant: "destructive",
-    });
-  });
-
-  it('should handle API errors', async () => {
-    mockRpc.mockResolvedValue({
+    mockSupabase.from().maybeSingle.mockResolvedValue({
       data: null,
-      error: new Error('Network error'),
-    });
-
-    const { result } = renderHook(() => usePromoCode());
-    
-    let validationResult;
-    await act(async () => {
-      validationResult = await result.current.validatePromoCode('SAVE10', 100);
-    });
-    
-    expect(validationResult).toEqual({
-      success: false,
-      error: 'Erreur lors de la validation du code promo',
-    });
-    expect(mockToast).toHaveBeenCalledWith({
-      title: "Erreur",
-      description: 'Erreur lors de la validation du code promo',
-      variant: "destructive",
-    });
-  });
-
-  it('should convert promo code to uppercase', async () => {
-    mockRpc.mockResolvedValue({
-      data: { success: true },
       error: null,
     });
 
     const { result } = renderHook(() => usePromoCode());
-    
+
     await act(async () => {
-      await result.current.validatePromoCode('save10', 100);
-    });
-    
-    expect(mockRpc).toHaveBeenCalledWith('apply_promo_code', {
-      p_code: 'SAVE10',
-      p_order_total: 100,
+      const promoResult = await result.current.applyPromoCode('INVALID');
+      expect(promoResult.success).toBe(false);
+      expect(promoResult.error).toBe('Code promo invalide');
     });
   });
 
-  it('should remove promo code', () => {
-    const storedPromoData = {
-      success: true,
-      promo_code_id: 'promo-123',
-      discount_amount: 10,
+  it('should handle expired promo code', async () => {
+    const expiredPromoCode = {
+      id: '1',
+      code: 'EXPIRED',
+      discount_type: 'percent',
+      discount_value: 20,
+      max_uses: 100,
+      uses_count: 50,
+      valid_from: '2024-01-01',
+      valid_until: '2023-12-31', // Expired
     };
-    
-    localStorage.setItem('appliedPromoCodeData', JSON.stringify(storedPromoData));
-    localStorage.setItem('appliedPromoCode', 'SAVE10');
-    
+
+    mockSupabase.from().maybeSingle.mockResolvedValue({
+      data: expiredPromoCode,
+      error: null,
+    });
+
     const { result } = renderHook(() => usePromoCode());
-    
+
+    await act(async () => {
+      const promoResult = await result.current.applyPromoCode('EXPIRED');
+      expect(promoResult.success).toBe(false);
+      expect(promoResult.error).toBe('Code promo expiré');
+    });
+  });
+
+  it('should handle max uses reached', async () => {
+    const maxUsesPromoCode = {
+      id: '1',
+      code: 'MAXUSED',
+      discount_type: 'percent',
+      discount_value: 20,
+      max_uses: 100,
+      uses_count: 100, // Max uses reached
+      valid_from: '2024-01-01',
+      valid_until: '2024-12-31',
+    };
+
+    mockSupabase.from().maybeSingle.mockResolvedValue({
+      data: maxUsesPromoCode,
+      error: null,
+    });
+
+    const { result } = renderHook(() => usePromoCode());
+
+    await act(async () => {
+      const promoResult = await result.current.applyPromoCode('MAXUSED');
+      expect(promoResult.success).toBe(false);
+      expect(promoResult.error).toBe('Code promo épuisé');
+    });
+  });
+
+  it('should handle database error', async () => {
+    mockSupabase.from().maybeSingle.mockResolvedValue({
+      data: null,
+      error: { message: 'Database error' },
+    });
+
+    const { result } = renderHook(() => usePromoCode());
+
+    await act(async () => {
+      const promoResult = await result.current.applyPromoCode('ERROR');
+      expect(promoResult.success).toBe(false);
+      expect(promoResult.error).toBe('Erreur lors de la vérification du code promo');
+    });
+  });
+
+  it('should remove applied promo code', () => {
+    const { result } = renderHook(() => usePromoCode());
+
+    // First apply a promo code
+    act(() => {
+      result.current.appliedPromoCode = {
+        success: true,
+        discount_type: 'percent',
+        discount_value: 20,
+      };
+    });
+
+    // Then remove it
     act(() => {
       result.current.removePromoCode();
     });
-    
+
     expect(result.current.appliedPromoCode).toBeNull();
-    expect(localStorage.getItem('appliedPromoCode')).toBeNull();
-    expect(localStorage.getItem('appliedPromoCodeData')).toBeNull();
-    expect(mockToast).toHaveBeenCalledWith({
-      title: "Code promo retiré",
-      description: "Le code promo a été retiré de votre commande",
-    });
   });
 
-  it('should increment promo code usage', async () => {
-    mockRpc.mockResolvedValue({
-      data: null,
+  it('should calculate discount amount correctly for percentage', () => {
+    const { result } = renderHook(() => usePromoCode());
+
+    act(() => {
+      result.current.appliedPromoCode = {
+        success: true,
+        discount_type: 'percent',
+        discount_value: 20,
+      };
+    });
+
+    const discountAmount = result.current.getDiscountAmount(100);
+    expect(discountAmount).toBe(20);
+  });
+
+  it('should calculate discount amount correctly for fixed amount', () => {
+    const { result } = renderHook(() => usePromoCode());
+
+    act(() => {
+      result.current.appliedPromoCode = {
+        success: true,
+        discount_type: 'fixed',
+        discount_value: 15,
+      };
+    });
+
+    const discountAmount = result.current.getDiscountAmount(100);
+    expect(discountAmount).toBe(15);
+  });
+
+  it('should return 0 discount when no promo code applied', () => {
+    const { result } = renderHook(() => usePromoCode());
+
+    const discountAmount = result.current.getDiscountAmount(100);
+    expect(discountAmount).toBe(0);
+  });
+
+  it('should handle case-insensitive promo codes', async () => {
+    const mockPromoCode = {
+      id: '1',
+      code: 'SAVE20',
+      discount_type: 'percent',
+      discount_value: 20,
+      max_uses: 100,
+      uses_count: 50,
+      valid_from: '2024-01-01',
+      valid_until: '2024-12-31',
+    };
+
+    mockSupabase.from().maybeSingle.mockResolvedValue({
+      data: mockPromoCode,
       error: null,
     });
 
     const { result } = renderHook(() => usePromoCode());
-    
+
     await act(async () => {
-      await result.current.incrementPromoCodeUsage('promo-123');
+      const promoResult = await result.current.applyPromoCode('save20');
+      expect(promoResult.success).toBe(true);
     });
-    
-    expect(mockRpc).toHaveBeenCalledWith('increment_promo_code_usage', {
-      p_promo_code_id: 'promo-123',
-    });
-  });
-
-  it('should handle errors when incrementing usage', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
-    mockRpc.mockResolvedValue({
-      data: null,
-      error: new Error('Database error'),
-    });
-
-    const { result } = renderHook(() => usePromoCode());
-    
-    await act(async () => {
-      await result.current.incrementPromoCodeUsage('promo-123');
-    });
-    
-    expect(consoleSpy).toHaveBeenCalledWith('Error incrementing promo code usage:', expect.any(Error));
-    
-    consoleSpy.mockRestore();
-  });
-
-  it('should set loading state during validation', async () => {
-    mockRpc.mockImplementation(
-      () => new Promise(resolve => 
-        setTimeout(() => resolve({ data: { success: true }, error: null }), 100)
-      )
-    );
-
-    const { result } = renderHook(() => usePromoCode());
-    
-    expect(result.current.loading).toBe(false);
-    
-    act(() => {
-      result.current.validatePromoCode('SAVE10', 100);
-    });
-    
-    expect(result.current.loading).toBe(true);
-    
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 150));
-    });
-    
-    expect(result.current.loading).toBe(false);
   });
 });

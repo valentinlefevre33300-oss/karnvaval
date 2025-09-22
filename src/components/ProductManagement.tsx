@@ -36,7 +36,17 @@ const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean 
       const { data, error } = await query;
       if (error) throw error;
 
-      setProducts(data || []);
+      // Normalize sizes to expected type
+      const normalized: Product[] = (data || []).map((p: any) => ({
+        ...p,
+        sizes: Array.isArray(p.sizes)
+          ? p.sizes.map(String)
+          : typeof p.sizes === 'string'
+            ? p.sizes
+            : String(p.sizes ?? ''),
+      }));
+
+      setProducts(normalized);
     } catch (error) {
       console.error('Error fetching products:', error);
       setError('Erreur lors du chargement des produits');
@@ -74,12 +84,46 @@ const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean 
         )
       );
 
-      const { error } = await supabase
-        .from('products')
-        .update({ stock_quantity: newStock })
-        .eq('product_id', productId);
+      // If we mark as rupture (0), also zero all per-size stocks to keep consistency
+      if (newStock === '0') {
+        // Get current product to read its per-size map
+        const product = products.find(p => p.product_id === productId);
+        let zeroMap: Record<string, number> = {};
+        const raw = product && (product as any).stock_by_size;
+        if (raw && typeof raw === 'object') {
+          Object.keys(raw).forEach(k => { zeroMap[String(k)] = 0; });
+        } else if (typeof raw === 'string') {
+          try {
+            const obj = JSON.parse(raw);
+            Object.keys(obj || {}).forEach(k => { zeroMap[String(k)] = 0; });
+          } catch {}
+        } else if (product) {
+          // Fallback from sizes
+          const sizesCsv = Array.isArray(product.sizes) ? (product.sizes as string[]).join(',') : (product.sizes || '');
+          sizesCsv.split(',').map(s => s.trim()).filter(Boolean).forEach(sz => { zeroMap[sz] = 0; });
+        }
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from('products' as any)
+          .update({
+            stock_quantity: '0',
+            stock_by_size: zeroMap,
+          } as any)
+          .eq('product_id', productId);
+
+        if (error) throw error;
+
+        // Reflect per-size zero in local state too if present
+        setProducts(prevProducts => prevProducts.map(p => p.product_id === productId ? ({ ...p, stock_quantity: '0',
+          stock_by_size: zeroMap,
+        }) : p));
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .update({ stock_quantity: newStock })
+          .eq('product_id', productId);
+        if (error) throw error;
+      }
 
       setMessage(`Produit ${newStock === '0' ? 'marqué en rupture' : 'remis en stock'}`);
       setTimeout(() => setMessage(''), 3000);
@@ -99,8 +143,7 @@ const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean 
   };
 
   const handleEditComplete = (updatedProduct?: Product) => {
-    setEditingProduct(null);
-    setIsEditDialogOpen(false);
+    // Close any external dialogs handled by ProductEditDialog itself
     
     // If we have the updated product, update the list directly
     if (updatedProduct) {
@@ -221,7 +264,11 @@ const ProductManagement = ({ showAddButton = false }: { showAddButton?: boolean 
                     <div className="flex items-center gap-2 justify-between sm:justify-start">
                       <Badge 
                         variant={isOutOfStock(product.stock_quantity) ? "destructive" : "default"}
-                        className="flex items-center gap-1 flex-shrink-0"
+                        className={`flex items-center gap-1 flex-shrink-0 ${
+                          !isOutOfStock(product.stock_quantity) 
+                            ? "bg-green-100 text-green-800 hover:bg-green-200 border-green-200" 
+                            : ""
+                        }`}
                       >
                         {isOutOfStock(product.stock_quantity) ? (
                           <>

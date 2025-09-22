@@ -53,6 +53,10 @@ export interface Product {
   stock_quantity: string;
   category: string;
   colors_general: string;
+  // Optional JSON per-size stock map coming from DB
+  stock_by_size?: Record<string, number> | string | null;
+  // Optional 3D model ID for Sketchfab integration
+  model_3d_id?: string;
 }
 
 // Helper functions for parsing CSV data
@@ -87,19 +91,52 @@ export const parseProductSizes = (sizesInput: string | string[]): string[] => {
 };
 
 export const parseProductColors = (colorsString: string): string[] => {
+  if (!colorsString) return [];
+  // First, try JSON array
   try {
-    const colors = JSON.parse(colorsString.replace(/'/g, '"'));
-    if (!Array.isArray(colors)) return [];
-    
-    // Remove duplicates using Set and filter out empty/null values
-    const validColors = colors
-      .filter(color => color && String(color).trim() !== '')
-      .map(color => String(color).trim());
-    
-    return Array.from(new Set(validColors));
+    const parsed = JSON.parse(colorsString.replace(/'/g, '"')) as unknown;
+    if (Array.isArray(parsed)) {
+      return Array.from(new Set(parsed
+        .filter((c) => c != null && String(c).trim() !== '')
+        .map((c) => String(c).trim())));
+    }
   } catch {
-    return [];
+    // ignore and fallback to CSV
   }
+  // Fallback: CSV like "Noir, blanc"
+  return colorsString
+    .split(',')
+    .map((c) => c.trim())
+    .filter(Boolean);
+};
+
+export const parseStockBySize = (input: unknown): Record<string, number> => {
+  if (!input) return {};
+  if (typeof input === 'object' && !Array.isArray(input)) {
+    const obj = input as Record<string, unknown>;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const n = Number(v);
+      if (!Number.isNaN(n)) out[String(k)] = n;
+    }
+    return out;
+  }
+  if (typeof input === 'string') {
+    try {
+      const parsed = JSON.parse(input) as unknown;
+      return parseStockBySize(parsed);
+    } catch {
+      // support csv pairs like "38:5,39:2"
+      const out: Record<string, number> = {};
+      input.split(',').map(s => s.trim()).filter(Boolean).forEach(pair => {
+        const [k, q] = pair.split(':').map(s => s.trim());
+        const n = Number(q);
+        if (k && !Number.isNaN(n)) out[k] = n;
+      });
+      return out;
+    }
+  }
+  return {};
 };
 
 export const getProductSlug = (name: string): string => {

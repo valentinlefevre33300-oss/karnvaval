@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Grid, List, Star, Filter } from 'lucide-react';
+import { Grid, List, Filter } from 'lucide-react';
 import { Product, parseProductSizes, getProductSlug } from '@/lib/types';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { withRetry, handleApiError } from '@/lib/api-utils';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { cleanTextSimple } from '@/lib/text-utils';
 interface Brand {
   id: string;
   name: string;
@@ -268,14 +269,6 @@ const Catalogue = () => {
                         <h3 className="font-semibold text-lg line-clamp-2">
                           {product.name}
                         </h3>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center">
-                            {[...Array(5)].map((_, i) => <Star key={i} className={`h-4 w-4 ${i < 4 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />)}
-                          </div>
-                          <span className="text-sm text-muted-foreground">
-                            (23 avis)
-                          </span>
-                        </div>
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <span className="text-2xl font-bold text-primary">
@@ -315,20 +308,12 @@ const Catalogue = () => {
                             <h3 className="font-semibold text-xl">
                               {product.name}
                             </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <div className="flex items-center">
-                                {[...Array(5)].map((_, i) => <Star key={i} className={`h-4 w-4 ${i < 4 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />)}
-                              </div>
-                              <span className="text-sm text-muted-foreground">
-                                (23 avis)
-                              </span>
-                            </div>
                             <Badge variant="secondary" className="mt-2">
                               {product.category || 'Général'}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground line-clamp-2">
-                            {product.description}
+                            {cleanTextSimple(product.description || '')}
                           </p>
                            <div className="flex items-center justify-between">
                              <div className="flex items-center gap-2">

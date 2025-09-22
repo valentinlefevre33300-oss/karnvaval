@@ -12,6 +12,7 @@ import { ArrowLeft, CreditCard, Truck, Shield, Check, Percent, X } from 'lucide-
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/hooks/useAuth';
 import { useOrders } from '@/hooks/useOrders';
+import { supabase } from '@/integrations/supabase/client';
 import { usePromoCode } from '@/hooks/usePromoCode';
 import { toast } from '@/hooks/use-toast';
 
@@ -38,6 +39,55 @@ const Checkout = () => {
 
   const [paymentMethod, setPaymentMethod] = useState('card');
   const [shippingMethod, setShippingMethod] = useState('standard');
+
+  // Simple client-side validators
+  const isValidEmail = (v: string) => /.+@.+\..+/.test(v);
+  const onlyDigits = (v: string) => v.replace(/\D+/g, '');
+  const isDigits = (v: string) => /^\d+$/.test(v);
+
+  // Payment fields
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState(''); // MM/AA
+  const [cardCvv, setCardCvv] = useState('');
+  const [cardName, setCardName] = useState('');
+
+  const luhnCheck = (num: string) => {
+    const arr = num.split('').reverse().map(n => parseInt(n, 10));
+    let sum = 0;
+    for (let i = 0; i < arr.length; i++) {
+      let n = arr[i];
+      if (i % 2 === 1) {
+        n *= 2;
+        if (n > 9) n -= 9;
+      }
+      sum += n;
+    }
+    return sum % 10 === 0;
+  };
+  const isValidCardNumber = (v: string) => {
+    const d = onlyDigits(v);
+    if (d.length < 13 || d.length > 19) return false;
+    return luhnCheck(d);
+  };
+  const isValidExpiry = (v: string) => {
+    const m = v.match(/^(\d{2})\/(\d{2})$/);
+    if (!m) return false;
+    const mm = parseInt(m[1], 10);
+    const yy = parseInt(m[2], 10); // 00-99
+    if (mm < 1 || mm > 12) return false;
+    return true;
+  };
+  const isValidCVV = (v: string) => /^\d{3,4}$/.test(v);
+  
+  // Fonction utilitaire pour les classes de validation
+  const getValidationClasses = (value: string, isValid: boolean) => {
+    if (!value) return ''; // Pas de classe si le champ est vide
+    if (isValid) {
+      return 'border-green-500 focus-visible:ring-green-500 focus-visible:ring-1';
+    } else {
+      return 'border-red-500 focus-visible:ring-red-500';
+    }
+  };
 
   const subtotal = getTotalPrice();
   const getShippingCost = () => {
@@ -122,6 +172,69 @@ const Checkout = () => {
       console.log('[Checkout] creating order with', { orderData, orderItemsCount: orderItems.length });
       const order = await createOrder(orderData, orderItems);
       console.log('[Checkout] order created', { id: order?.id, number: order?.order_number });
+      
+      // Decrement per-size stocks after payment confirmation (front-only, non-atomic but sufficient here)
+      try {
+        console.time('[Checkout] update stocks');
+        // Aggregate requested quantities per product/size
+        const wanted = new Map<string, Map<string, number>>();
+        for (const it of orderItems) {
+          if (!it.selected_size) continue;
+          const pid = it.product_id;
+          const size = String(it.selected_size);
+          if (!wanted.has(pid)) wanted.set(pid, new Map());
+          const m = wanted.get(pid)!;
+          m.set(size, (m.get(size) || 0) + (it.quantity || 1));
+        }
+
+        const productIds = Array.from(wanted.keys());
+        if (productIds.length) {
+        const { data: products, error: fetchErr } = await (supabase as any)
+          .from('products')
+          .select('product_id, stock_by_size, sizes')
+          .in('product_id', productIds);
+          if (fetchErr) throw fetchErr;
+
+          for (const p of products || []) {
+            const pid: string = p.product_id;
+            const dec = wanted.get(pid);
+            if (!dec) continue;
+
+            // Parse current per-size stock
+            let stockMap: Record<string, number> = {};
+            const raw = (p as any).stock_by_size;
+            if (raw && typeof raw === 'object') stockMap = Object.fromEntries(Object.entries(raw).map(([k,v]) => [String(k), Number(v) || 0]));
+            else if (typeof raw === 'string') {
+              try { const obj = JSON.parse(raw); stockMap = Object.fromEntries(Object.entries(obj).map(([k,v]) => [String(k), Number(v) || 0])); } catch {}
+            }
+
+            // Apply decrements
+            for (const [size, q] of dec.entries()) {
+              const current = stockMap[size] || 0;
+              const next = Math.max(0, current - q);
+              stockMap[size] = next;
+              console.log('[Checkout] decrement', { product_id: pid, size, current, q, next });
+            }
+
+            const newTotal = Object.values(stockMap).reduce((a, b) => a + (Number(b) || 0), 0);
+            const newSizes = Object.keys(stockMap).sort((a,b)=>Number(a)-Number(b));
+
+            const { error: upErr } = await supabase
+              .from('products' as any)
+              .update({
+                stock_by_size: stockMap,
+                stock_quantity: String(newTotal),
+                sizes: newSizes.length ? JSON.stringify(newSizes) : null,
+              } as any)
+              .eq('product_id', pid);
+            if (upErr) throw upErr;
+          }
+        }
+        console.timeEnd('[Checkout] update stocks');
+      } catch (stockErr) {
+        console.error('[Checkout] stock update error', stockErr);
+        // Continue flow; in a real PSP flow, this would be retried/alerted
+      }
       
       // Incrémenter le compteur d'utilisation du code promo si utilisé
       if (appliedPromoCode?.promo_code_id) {
@@ -239,6 +352,7 @@ const Checkout = () => {
                         id="firstName"
                         value={shippingInfo.firstName}
                         onChange={(e) => setShippingInfo({...shippingInfo, firstName: e.target.value})}
+                        className={getValidationClasses(shippingInfo.firstName, shippingInfo.firstName.trim() !== '')}
                       />
                     </div>
                     <div className="space-y-2">
@@ -247,27 +361,41 @@ const Checkout = () => {
                         id="lastName"
                         value={shippingInfo.lastName}
                         onChange={(e) => setShippingInfo({...shippingInfo, lastName: e.target.value})}
+                        className={getValidationClasses(shippingInfo.lastName, shippingInfo.lastName.trim() !== '')}
                       />
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
                       type="email"
                       value={shippingInfo.email}
                       onChange={(e) => setShippingInfo({...shippingInfo, email: e.target.value})}
+                      className={getValidationClasses(shippingInfo.email, isValidEmail(shippingInfo.email))}
                     />
+                    {!isValidEmail(shippingInfo.email) && (
+                      <p className="text-xs text-red-600">Veuillez saisir un email valide (avec @).</p>
+                    )}
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <Label htmlFor="phone">Téléphone</Label>
                     <Input
                       id="phone"
+                      inputMode="numeric"
+                      placeholder="0601020304"
                       value={shippingInfo.phone}
-                      onChange={(e) => setShippingInfo({...shippingInfo, phone: e.target.value})}
+                      onChange={(e) => {
+                        const v = onlyDigits(e.target.value);
+                        setShippingInfo({...shippingInfo, phone: v});
+                      }}
+                      className={getValidationClasses(shippingInfo.phone, isDigits(shippingInfo.phone) && shippingInfo.phone.length >= 10)}
                     />
+                    {shippingInfo.phone === '' && (
+                      <p className="text-xs text-muted-foreground">Chiffres uniquement.</p>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
@@ -277,6 +405,7 @@ const Checkout = () => {
                       value={shippingInfo.address}
                       onChange={(e) => setShippingInfo({...shippingInfo, address: e.target.value})}
                       placeholder="123 rue de la Paix"
+                      className={getValidationClasses(shippingInfo.address, shippingInfo.address.trim() !== '')}
                     />
                   </div>
                   
@@ -287,14 +416,21 @@ const Checkout = () => {
                         id="city"
                         value={shippingInfo.city}
                         onChange={(e) => setShippingInfo({...shippingInfo, city: e.target.value})}
+                        className={getValidationClasses(shippingInfo.city, shippingInfo.city.trim() !== '')}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       <Label htmlFor="postalCode">Code postal</Label>
                       <Input
                         id="postalCode"
+                        inputMode="numeric"
+                        placeholder="75001"
                         value={shippingInfo.postalCode}
-                        onChange={(e) => setShippingInfo({...shippingInfo, postalCode: e.target.value})}
+                        onChange={(e) => {
+                          const v = onlyDigits(e.target.value);
+                          setShippingInfo({...shippingInfo, postalCode: v});
+                        }}
+                        className={getValidationClasses(shippingInfo.postalCode, shippingInfo.postalCode.length === 5)}
                       />
                     </div>
                   </div>
@@ -340,7 +476,7 @@ const Checkout = () => {
               <Button 
                 onClick={() => setCurrentStep(2)} 
                 className="w-full"
-                disabled={!shippingInfo.firstName || !shippingInfo.lastName || !shippingInfo.address}
+                disabled={!shippingInfo.firstName || !shippingInfo.lastName || !shippingInfo.address || !isValidEmail(shippingInfo.email) || !isDigits(shippingInfo.phone) || shippingInfo.postalCode.length < 4}
               >
                 Continuer vers le paiement
               </Button>
@@ -374,23 +510,66 @@ const Checkout = () => {
                     <div className="mt-6 space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="cardNumber">Numéro de carte</Label>
-                        <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
+                        <Input 
+                          id="cardNumber" 
+                          placeholder="1234 5678 9012 3456"
+                          inputMode="numeric"
+                          value={cardNumber}
+                          onChange={(e) => setCardNumber(e.target.value.replace(/[^\d ]/g, ''))}
+                          className={getValidationClasses(cardNumber, isValidCardNumber(cardNumber))}
+                        />
+                        {cardNumber && !isValidCardNumber(cardNumber) && (
+                          <p className="text-xs text-red-600">Numéro de carte invalide.</p>
+                        )}
                       </div>
                       
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="expiryDate">Date d'expiration</Label>
-                          <Input id="expiryDate" placeholder="MM/AA" />
+                          <Input 
+                            id="expiryDate" 
+                            placeholder="MM/AA"
+                            value={cardExpiry}
+                            onChange={(e) => {
+                              let v = e.target.value.replace(/[^\d]/g, '');
+                              if (v.length > 4) v = v.slice(0,4);
+                              if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+                              setCardExpiry(v);
+                            }}
+                            className={getValidationClasses(cardExpiry, isValidExpiry(cardExpiry))}
+                          />
+                          {cardExpiry && !isValidExpiry(cardExpiry) && (
+                            <p className="text-xs text-red-600">Format attendu MM/AA.</p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="cvv">CVV</Label>
-                          <Input id="cvv" placeholder="123" />
+                          <Input 
+                            id="cvv" 
+                            placeholder="123" 
+                            inputMode="numeric"
+                            value={cardCvv}
+                            onChange={(e) => setCardCvv(onlyDigits(e.target.value).slice(0,4))}
+                            className={getValidationClasses(cardCvv, isValidCVV(cardCvv))}
+                          />
+                          {cardCvv && !isValidCVV(cardCvv) && (
+                            <p className="text-xs text-red-600">3 ou 4 chiffres.</p>
+                          )}
                         </div>
                       </div>
                       
                       <div className="space-y-2">
                         <Label htmlFor="cardName">Nom sur la carte</Label>
-                        <Input id="cardName" placeholder="John Doe" />
+                        <Input 
+                          id="cardName" 
+                          placeholder="John Doe" 
+                          value={cardName}
+                          onChange={(e) => setCardName(e.target.value)}
+                          className={getValidationClasses(cardName, cardName.trim() !== '')}
+                        />
+                        {cardName === '' && (
+                          <p className="text-xs text-red-600">Nom requis.</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -401,7 +580,11 @@ const Checkout = () => {
                 <Button variant="outline" onClick={() => setCurrentStep(1)} className="w-full sm:flex-1">
                   Retour
                 </Button>
-                <Button onClick={() => setCurrentStep(3)} className="w-full sm:flex-1">
+                <Button 
+                  onClick={() => setCurrentStep(3)} 
+                  className="w-full sm:flex-1"
+                  disabled={paymentMethod === 'card' && (!isValidCardNumber(cardNumber) || !isValidExpiry(cardExpiry) || !isValidCVV(cardCvv) || cardName === '')}
+                >
                   Réviser la commande
                 </Button>
               </div>

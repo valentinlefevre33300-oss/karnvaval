@@ -9,12 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Store, User, Mail, Phone, Building, FileText, Percent, CheckCircle, XCircle, ShoppingCart, Package, TrendingUp, Users } from 'lucide-react';
+import { Store, User, Mail } from 'lucide-react';
 import OrdersList from '@/components/OrdersList';
 import ProductManagement from '@/components/ProductManagement';
-import ProductForm from '@/components/ProductForm';
 export const VendorProfile = () => {
   const {
     authUser,
@@ -57,11 +54,6 @@ export const VendorProfile = () => {
   }, [authUser?.profile, authUser?.vendor_profile, setProfileData, setVendorData]);
 
   
-  const [stats, setStats] = useState({
-    ordersCount: 0,
-    productsCount: 0,
-    totalRevenue: 15420 // CA fictif
-  });
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfileData(prev => ({
       ...prev,
@@ -125,40 +117,6 @@ export const VendorProfile = () => {
       setLoading(false);
     }
   }, [authUser?.id, vendorData]);
-  const fetchVendorStats = useCallback(async () => {
-    if (!authUser?.id) return;
-    try {
-      // Count orders
-      const {
-        data: ordersData,
-        count: ordersCount
-      } = await supabase.from('orders').select('*', {
-        count: 'exact',
-        head: true
-      });
-
-      // Count products
-      const {
-        data: productsData,
-        count: productsCount
-      } = await supabase.from('products').select('*', {
-        count: 'exact',
-        head: true
-      });
-      setStats(prev => ({
-        ...prev,
-        ordersCount: ordersCount || 0,
-        productsCount: productsCount || 0
-      }));
-    } catch (error) {
-      console.error('Error fetching vendor stats:', error);
-    }
-  }, [authUser?.id]);
-  useEffect(() => {
-    if (authUser?.id) {
-      fetchVendorStats();
-    }
-  }, [authUser?.id, fetchVendorStats]);
   const handleSignOut = async () => {
     await signOut();
   };
@@ -178,56 +136,13 @@ export const VendorProfile = () => {
             {message}
           </Alert>}
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Vue d'ensemble</TabsTrigger>
+        <Tabs defaultValue="orders" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="orders">Commandes</TabsTrigger>
             <TabsTrigger value="products">Produits</TabsTrigger>
             <TabsTrigger value="profile">Profil vendeur</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Commandes</CardTitle>
-                  <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.ordersCount}</div>
-                  <p className="text-xs text-muted-foreground">
-                    commandes traitées
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Produits</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.productsCount}</div>
-                  <p className="text-xs text-muted-foreground">
-                    produits en vente
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">CA Total</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats.totalRevenue.toLocaleString('fr-FR')}€</div>
-                  <p className="text-xs text-muted-foreground">
-                    chiffre d'affaires
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
 
           <TabsContent value="orders" className="space-y-6">
             <Card>
@@ -241,7 +156,7 @@ export const VendorProfile = () => {
           </TabsContent>
 
           <TabsContent value="products" className="space-y-6">
-            <ProductManagement showAddButton={true} />
+            <ProductManagement showAddButton={false} />
           </TabsContent>
 
           <TabsContent value="profile" className="space-y-6">

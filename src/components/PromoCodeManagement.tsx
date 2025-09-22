@@ -340,7 +340,7 @@ export const PromoCodeManagement = () => {
                           ) : isMaxUsesReached(promo.max_uses, promo.uses_count) ? (
                             <Badge variant="secondary">Épuisé</Badge>
                           ) : (
-                            <Badge variant="default">Actif</Badge>
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">Actif</Badge>
                           )}
                         </TableCell>
                         <TableCell>

@@ -166,20 +166,97 @@ const OrdersList: React.FC<OrdersListProps> = ({ showAllOrders = false }) => {
     );
   }
 
-  if (filteredOrders.length === 0 && orders.length > 0) {
-    return (
-      <Card>
-        <CardContent className="p-8 text-center">
-          <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="font-semibold text-lg mb-2">Aucune commande trouvée</h3>
-          <p className="text-muted-foreground">
-            Aucune commande ne correspond aux filtres sélectionnés.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Render filters component
+  const renderFilters = () => (
+    <Card>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="status-filter" className="text-sm">Filtrer par statut</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Tous les statuts" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="pending">En attente</SelectItem>
+                <SelectItem value="confirmed">Confirmée</SelectItem>
+                <SelectItem value="processing">En préparation</SelectItem>
+                <SelectItem value="shipped">Expédiée</SelectItem>
+                <SelectItem value="delivered">Livrée</SelectItem>
+                <SelectItem value="cancelled">Annulée</SelectItem>
+                <SelectItem value="refunded">Remboursée</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
+          <div className="space-y-2">
+            <Label className="text-sm">Date de début</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <span className="truncate">
+                    {startDate ? startDate.toLocaleDateString('fr-FR') : "Sélectionner"}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={startDate}
+                  onSelect={setStartDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm">Date de fin</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <span className="truncate">
+                    {endDate ? endDate.toLocaleDateString('fr-FR') : "Sélectionner"}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={endDate}
+                  onSelect={setEndDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="space-y-2 flex flex-col justify-end">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setStatusFilter('all');
+                setStartDate(undefined);
+                setEndDate(undefined);
+              }}
+              className="w-full"
+            >
+              Réinitialiser
+            </Button>
+          </div>
+        </div>
+        
+        <div className="mt-4 text-sm text-muted-foreground">
+          {filteredOrders.length} commande(s) trouvée(s) sur {orders.length} au total
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // If no orders at all, show empty state without filters
   if (orders.length === 0) {
     return (
       <Card>
@@ -201,95 +278,33 @@ const OrdersList: React.FC<OrdersListProps> = ({ showAllOrders = false }) => {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="status-filter" className="text-sm">Filtrer par statut</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Tous les statuts" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="pending">En attente</SelectItem>
-                  <SelectItem value="confirmed">Confirmée</SelectItem>
-                  <SelectItem value="processing">En préparation</SelectItem>
-                  <SelectItem value="shipped">Expédiée</SelectItem>
-                  <SelectItem value="delivered">Livrée</SelectItem>
-                  <SelectItem value="cancelled">Annulée</SelectItem>
-                  <SelectItem value="refunded">Remboursée</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Always show filters when there are orders */}
+      {renderFilters()}
 
-            <div className="space-y-2">
-              <Label className="text-sm">Date de début</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    <span className="truncate">
-                      {startDate ? startDate.toLocaleDateString('fr-FR') : "Sélectionner"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm">Date de fin</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    <span className="truncate">
-                      {endDate ? endDate.toLocaleDateString('fr-FR') : "Sélectionner"}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2 flex flex-col justify-end">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setStatusFilter('all');
-                  setStartDate(undefined);
-                  setEndDate(undefined);
-                }}
-                className="w-full"
-              >
-                Réinitialiser
-              </Button>
-            </div>
-          </div>
-          
-          <div className="mt-4 text-sm text-muted-foreground">
-            {filteredOrders.length} commande(s) trouvée(s) sur {orders.length} au total
-          </div>
-        </CardContent>
-      </Card>
-
-      {filteredOrders.map((order) => (
+      {/* Show filtered results or empty state */}
+      {filteredOrders.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="font-semibold text-lg mb-2">Aucune commande trouvée</h3>
+            <p className="text-muted-foreground">
+              Aucune commande ne correspond aux filtres sélectionnés.
+            </p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => {
+                setStatusFilter('all');
+                setStartDate(undefined);
+                setEndDate(undefined);
+              }}
+            >
+              Réinitialiser les filtres
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        filteredOrders.map((order) => (
         <Card key={order.id} className="hover:shadow-md transition-shadow">
           <CardContent className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
@@ -559,7 +574,8 @@ const OrdersList: React.FC<OrdersListProps> = ({ showAllOrders = false }) => {
             </div>
           </CardContent>
         </Card>
-      ))}
+        ))
+      )}
     </div>
   );
 };
